@@ -368,3 +368,88 @@ This architecture ensures:
 ✅ Robust error handling
 ✅ Extensibility for new agents
 ✅ Production-ready quality
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+This project is a Multi-Agent System (MAS) designed to automate the code review process. It works like an assembly line where specialized AI "agents" review your code for different qualities (Security, Performance, Style) and then collaborate to write a final report.
+
+Here is a detailed breakdown of every aspect of the system:
+
+1. High-Level Architecture
+The system is built on LangGraph, a library for building stateful, multi-agent workflows. Unlike a simple script that runs top-to-bottom, this project uses a Graph structure where:
+
+Nodes are the Agents (workers performing tasks).
+Edges define the workflow (who passes work to whom).
+State is a shared memory object that passes between agents, accumulating data.
+2. The Workflow (Step-by-Step)
+When you run python main.py --path <repo>, the following pipeline executes:
+
+Phase 1: Ingestion (The Ingestor Agent)
+Everything starts here. The Ingestor is responsible for "reading" the code.
+
+Input Handling: It checks if your input is a local folder or a GitHub URL.
+Cloning: If it's a URL, it uses GitPython to securely clone the repository to a temporary directory.
+Filtering: It walks through the files but intelligently ignores anything in 
+.gitignore
+ or non-code files (images, binaries) to save processing power.
+Output: It populates the "File Tree" in the shared state, a list of all files that need to be analyzed.
+Phase 2: The Analysis Chain
+Currently, the system runs three specialized agents in sequence for maximum stability. Each agent follows a Hybrid Analysis pattern: it runs a standard algorithmic tool first (for hard facts), then uses an LLM (Gemini or Ollama) to interpret the results and find nuanced issues.
+
+🔒 Security Agent ("The Auditor")
+Step 1 (Tool): Runs Bandit, a standard security linter. Bandit is great at finding known signatures (e.g., "This looks like an MD5 hash").
+Step 2 (AI): It feeds the code and Bandit's findings to the LLM. The AI filters out false positives and looks for logic bugs that tools miss (e.g., "This function allows a user to elevate their own privileges").
+Focus: SQL Injection, hardcoded secrets, XSS.
+⚡ Performance Agent ("The Optimizer")
+Step 1 (Tool): Runs Radon to calculate "Cyclomatic Complexity" (a mathematical score of how nested and complex your code is).
+Step 2 (AI): The AI looks at complex functions to spot algorithmic inefficiencies. It can identify O(n²) nested loops, N+1 database queries, or redundant computations that a simple linter wouldn't catch.
+✨ Style Agent ("The Craftsman")
+Step 1 (Tool): Runs Pylint to check for PEP8 compliance (indentation, variable naming).
+Step 2 (AI): The AI reviews the code for "Clean Code" principles. It checks for readability, proper function naming (e.g., "This function is named process() but acts like save_user()"), and SOLID design principles.
+Phase 3: Aggregation (The Aggregator Agent)
+Once all three analysis agents have added their findings to the shared state, the Aggregator takes over.
+
+Synthesis: It reads through all findings (Security, Performance, Style).
+Scoring: It calculates a "Health Score" for the codebase based on the severity and count of issues.
+Reporting: It uses the LLM to write a cohesive Markdown Report. This isn't just a list of errors; it includes an Executive Summary, a file-by-file breakdown, and prioritized recommendations.
+Cleanup: It deletes any temporary cloned repositories.
+3. Key Technical Components
+Shared State (ReviewState): This is the "brain" of the application. It looks like a dictionary that grows as the workflow progresses:
+python
+{
+    "input_path": "...",
+    "file_tree": ["main.py", "utils.py"],
+    "security_findings": [{...}, {...}],    # Added by Security Agent
+    "performance_findings": [{...}],         # Added by Performance Agent
+    "style_findings": [{...}],               # Added by Style Agent
+    "final_report": "..."                    # Created by Aggregator
+}
+The Hybrid Approach: This is the "secret sauce."
+Why Tools? LLMs can hallucinate. Tools like Bandit provide ground truth (e.g., line 42 definitely has a specific vulnerability pattern).
+Why LLMs? Tools are dumb. They can't understand context. The LLM acts as a senior engineer who reviews the tool's output and adds context-aware insights.
+Orchestration:
+The 
+graph/workflow.py
+ file defines the path. Currently, it forces a sequential path (Security -> Performance -> Style) to ensure that agents don't overwrite each other's state and to manage API rate limits effectively.
+4. How to Use It
+Configure: Set your GOOGLE_API_KEY in 
+.env
+.
+Run:
+bash
+python main.py --path https://github.com/username/repo
+(Or use a local path)
+Result: A file named REVIEW_REPORT.md will be generated in code_reviews/, containing the full analysis.
+Good
+Bad

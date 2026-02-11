@@ -183,3 +183,6 @@ We welcome contributions! Please follow these steps:
 ## � License
 
 Distributed under the MIT License. See `LICENSE` for more information.
+
+
+PS D:\SAMI\AgenticAI\Automated Code Review Agent for Software Quality> .venv\Scripts\python.exe main.py --path https://github.com/SAMI-CODEAI/SalesVisionLR.git
