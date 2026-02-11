@@ -1,0 +1,42 @@
+# Core LangGraph and LangChain Dependencies
+langgraph>=0.2.0
+langchain>=0.3.0
+langchain-core>=0.3.0
+langchain-google-genai>=2.0.0
+langchain-ollama>=0.1.0
+
+# Code Ingestion and Git Operations
+GitPython>=3.1.40
+pathlib2>=2.3.7
+
+# Static Analysis Tools
+bandit>=1.7.5
+radon>=6.0.1
+pylint>=3.0.0
+
+# Python Code Analysis
+ast-comments>=1.2.0
+
+# Environment and Configuration
+python-dotenv>=1.0.0
+
+# CLI and UI
+click>=8.1.7
+colorama>=0.4.6
+rich>=13.7.0
+
+# File Processing
+pathspec>=0.12.0  # For .gitignore parsing
+
+# Utilities
+pydantic>=2.5.0
+tenacity>=8.2.3  # For retries
+
+# Testing (Development)
+pytest>=7.4.3
+pytest-asyncio>=0.23.0
+pytest-mock>=3.12.0
+
+# Type Checking (Development)
+mypy>=1.7.0
+types-requests>=2.31.0
