@@ -3,6 +3,7 @@ Aggregator Agent - Final Report Compilation
 """
 
 import os
+import shutil
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Union
@@ -445,6 +446,7 @@ def create_aggregator_agent_node():
         # Check for errors
         if state.get('error'):
             logger.error(f"❌ Aggregator Node: Cannot generate report due to error: {state['error']}")
+            _cleanup_temp_directory(state)
             return state
         
         # Get output directory
@@ -457,6 +459,9 @@ def create_aggregator_agent_node():
             
             logger.info("📋 Aggregator Node: Completed")
             
+            # Clean up temporary directory (cloned repo) now that all analysis is done
+            _cleanup_temp_directory(state)
+            
             return {
                 **state,
                 'final_report': report_content,
@@ -465,9 +470,23 @@ def create_aggregator_agent_node():
             
         except Exception as e:
             logger.error(f"❌ Aggregator Node failed: {str(e)}", exc_info=True)
+            _cleanup_temp_directory(state)
             return {
                 **state,
                 'error': f"Report generation failed: {str(e)}"
             }
     
     return aggregator_node
+
+
+def _cleanup_temp_directory(state: Dict):
+    """Clean up temporary cloned repository directory if applicable."""
+    if state.get('is_temp_directory') and state.get('working_directory'):
+        working_dir = Path(state['working_directory'])
+        if working_dir.exists():
+            try:
+                logger.info(f"🧹 Cleaning up temporary directory: {working_dir}")
+                shutil.rmtree(working_dir, ignore_errors=True)
+                logger.info("✅ Temporary directory cleaned up")
+            except Exception as e:
+                logger.warning(f"⚠️ Failed to clean up temp directory: {str(e)}")

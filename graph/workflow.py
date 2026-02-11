@@ -86,26 +86,20 @@ def create_review_graph() -> StateGraph:
     workflow.set_entry_point("ingestor")
     
     # Add conditional edge after ingestor
+    # Routes to security on success (which fans out to all agents via edges below)
+    # Routes to END on failure
     workflow.add_conditional_edges(
         "ingestor",
         should_continue_to_agents,
         {
-            "continue": "security",  # Go to security (which triggers all parallel nodes)
+            "continue": "security",
             END: END
         }
     )
     
-    # Parallel execution: All three agents start after ingestor
-    # Since we route to "security" above, we need to also trigger the others
-    # In LangGraph, we achieve parallelism by having multiple edges from the same source
-    
-    # From ingestor, we also trigger performance and style
-    workflow.add_edge("ingestor", "performance")
-    workflow.add_edge("ingestor", "style")
-    
-    # All three agents converge to aggregator
-    workflow.add_edge("security", "aggregator")
-    workflow.add_edge("performance", "aggregator")
+    # All three agents converge to aggregator (sequential chain)
+    workflow.add_edge("security", "performance")
+    workflow.add_edge("performance", "style")
     workflow.add_edge("style", "aggregator")
     
     # End after aggregator
@@ -114,7 +108,7 @@ def create_review_graph() -> StateGraph:
     # Compile the graph
     logger.info("✅ Workflow graph created successfully")
     logger.info("   📍 Entry point: ingestor")
-    logger.info("   🔀 Parallel nodes: security, performance, style")
+    logger.info("   🔀 Sequential nodes: security → performance → style")
     logger.info("   📊 Aggregator: final report compilation")
     
     return workflow.compile()

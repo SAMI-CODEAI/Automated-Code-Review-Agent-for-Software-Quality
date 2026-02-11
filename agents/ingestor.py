@@ -246,12 +246,19 @@ def create_ingestor_node():
             result = ingestor.ingest(input_path)
             
             if not result['success']:
+                # Clean up temp dirs on failure
+                ingestor.cleanup()
                 return {
                     **state,
                     'error': result['error'],
                     'file_tree': {},
                     'total_files': 0
                 }
+            
+            # IMPORTANT: Prevent auto-cleanup on __del__ so downstream agents
+            # can still read the cloned files. Cleanup will happen in the
+            # aggregator node after all agents have finished.
+            ingestor.temp_directories.clear()
             
             # Update state
             updated_state = {
@@ -268,6 +275,7 @@ def create_ingestor_node():
             
         except Exception as e:
             logger.error(f"❌ Ingestor node failed: {str(e)}", exc_info=True)
+            ingestor.cleanup()
             return {
                 **state,
                 'error': str(e),
