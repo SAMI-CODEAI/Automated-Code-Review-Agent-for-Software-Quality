@@ -149,22 +149,45 @@ class AggregatorAgent:
         
         perf_critical = len([f for f in performance_findings if f.get('impact') == 'CRITICAL'])
         perf_high = len([f for f in performance_findings if f.get('impact') == 'HIGH'])
+        perf_medium = len([f for f in performance_findings if f.get('impact') == 'MEDIUM'])
+        perf_low = len([f for f in performance_findings if f.get('impact') == 'LOW'])
         
-        total_issues = len(security_findings) + len(performance_findings) + len(style_findings)
-        total_critical = security_critical + perf_critical
+        style_count = len(style_findings)
         
         # File statistics
         total_size_mb = file_tree.get('total_size_mb', 0)
         extensions = file_tree.get('extensions', {})
         
-        # Health score (simple calculation)
-        health_score = max(0, 100 - (total_critical * 10) - (security_high * 5) - (perf_high * 3))
+        total_issues = len(security_findings) + len(performance_findings) + len(style_findings)
+        total_critical = security_critical + perf_critical
+        
+        # Health score (strict calculation)
+        deductions = (
+            (total_critical * 15) + 
+            (security_high * 10) + 
+            (perf_high * 8) + 
+            (security_medium * 4) + 
+            (perf_medium * 3) + 
+            (security_low * 2) + 
+            (perf_low * 1) + 
+            (style_count * 2)
+        )
+        
+        # Base penalty for mere presence of issues
+        if total_issues > 0:
+            deductions += 5
+            
+        health_score = max(0, 100 - deductions)
+        
+        # Force cap at 85 unless code is truly impeccable
+        if total_issues > 0 and health_score > 95:
+            health_score = 95
         
         if health_score >= 90:
             health_label = "🟢 Excellent"
-        elif health_score >= 75:
+        elif health_score >= 70:
             health_label = "🟡 Good"
-        elif health_score >= 50:
+        elif health_score >= 40:
             health_label = "🟠 Fair"
         else:
             health_label = "🔴 Needs Attention"
@@ -266,11 +289,17 @@ Security analysis performed using Bandit static analyzer enhanced with AI-powere
                 issue_type = finding.get('issue_type', 'Unknown')
                 description = finding.get('description', 'No description')
                 recommendation = finding.get('recommendation', 'No recommendation')
+                cwe_id = finding.get('cwe_id')
+                owasp = finding.get('owasp_category')
                 
-                section += f"#### {idx}. {issue_type}\n"
-                section += f"- **File**: `{file_name}` (Line {line})\n"
-                section += f"- **Description**: {description}\n"
-                section += f"- **Recommendation**: {recommendation}\n\n"
+                section += f"#### {idx}. 🚨 {issue_type}\n"
+                section += f"- **📍 Location**: `{file_name}` at Line **{line}**\n"
+                if cwe_id:
+                    section += f"- **⚙️ CWE**: CWE-{cwe_id}\n"
+                if owasp:
+                    section += f"- **🛡️ OWASP**: {owasp}\n"
+                section += f"- **📝 Technical Analysis**: {description}\n\n"
+                section += f"> **💡 Remediation Plan**:  \n> {recommendation.replace(chr(10), chr(10) + '> ')}\n\n"
         
         return section
     
@@ -305,15 +334,16 @@ Performance analysis performed using Radon complexity analyzer enhanced with AI-
                 recommendation = finding.get('recommendation', 'No recommendation')
                 current_complexity = finding.get('current_complexity', 'N/A')
                 optimized_complexity = finding.get('optimized_complexity', 'N/A')
+                improvement = finding.get('estimated_improvement', 'N/A')
                 
-                section += f"#### {idx}. {issue_type}\n"
-                section += f"- **File**: `{file_name}` (Line {line})\n"
-                section += f"- **Description**: {description}\n"
-                if current_complexity != 'N/A':
-                    section += f"- **Current Complexity**: {current_complexity}\n"
-                if optimized_complexity != 'N/A':
-                    section += f"- **Optimized Complexity**: {optimized_complexity}\n"
-                section += f"- **Recommendation**: {recommendation}\n\n"
+                section += f"#### {idx}. ⚡ {issue_type}\n"
+                section += f"- **📍 Location**: `{file_name}` at Line **{line}**\n"
+                if current_complexity != 'N/A' or optimized_complexity != 'N/A':
+                    section += f"- **⏱️ Algorithmic Complexity**: {current_complexity} ➔ **{optimized_complexity}**\n"
+                if improvement != 'N/A':
+                    section += f"- **📉 Estimated Impact**: *{improvement}*\n"
+                section += f"- **📝 Technical Analysis**: {description}\n\n"
+                section += f"> **💡 Remediation Plan**:  \n> {recommendation.replace(chr(10), chr(10) + '> ')}\n\n"
         
         return section
     
@@ -347,13 +377,16 @@ Code quality analysis based on Clean Code principles, SOLID design patterns, and
                 description = finding.get('description', 'No description')
                 recommendation = finding.get('recommendation', 'No recommendation')
                 principle = finding.get('principle_violated', '')
+                maintainability = finding.get('impact_on_maintainability', '')
                 
-                section += f"#### {idx}. {issue_type}\n"
-                section += f"- **File**: `{file_name}` (Line {line})\n"
+                section += f"#### {idx}. ✨ {issue_type}\n"
+                section += f"- **📍 Location**: `{file_name}` at Line **{line}**\n"
                 if principle:
-                    section += f"- **Principle Violated**: {principle}\n"
-                section += f"- **Description**: {description}\n"
-                section += f"- **Recommendation**: {recommendation}\n\n"
+                    section += f"- **📐 Principle Violated**: **{principle}**\n"
+                if maintainability:
+                    section += f"- **🏗️ Technical Debt Impact**: *{maintainability}*\n"
+                section += f"- **📝 Technical Analysis**: {description}\n\n"
+                section += f"> **💡 Refactoring Guidance**:  \n> {recommendation.replace(chr(10), chr(10) + '> ')}\n\n"
         
         return section
     

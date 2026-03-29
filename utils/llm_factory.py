@@ -73,6 +73,43 @@ def _create_ollama_llm(
         raise
 
 
+def _create_openai_llm(
+    model_name: Optional[str],
+    temperature: float,
+    max_tokens: int
+) -> BaseChatModel:
+    """Create OpenAI LLM instance."""
+    try:
+        from langchain_openai import ChatOpenAI
+    except ImportError:
+        raise ImportError(
+            "langchain-openai not installed. "
+            "Install with: pip install langchain-openai"
+        )
+    
+    model = model_name or os.getenv('OPENAI_MODEL', 'gpt-4o-mini')
+    api_key = os.getenv('OPENAI_API_KEY')
+    
+    if not api_key or api_key == 'your_openai_api_key_here':
+        raise ValueError(
+            "OPENAI_API_KEY not set. Please configure .env file with your API key."
+        )
+        
+    logger.info(f"🤖 Initializing OpenAI LLM: {model}")
+    
+    try:
+        llm = ChatOpenAI(
+            model=model,
+            temperature=temperature,
+            max_tokens=max_tokens,
+            api_key=api_key
+        )
+        return llm
+    except Exception as e:
+        logger.error(f"❌ Failed to initialize OpenAI LLM: {str(e)}")
+        raise
+
+
 def _create_gemini_llm(
     model_name: Optional[str],
     temperature: float,
@@ -104,7 +141,19 @@ def _create_gemini_llm(
             max_output_tokens=max_tokens,
             google_api_key=api_key
         )
-        return llm
+        
+        try:
+            openai_fallback = _create_openai_llm(None, temperature, max_tokens)
+            ollama_fallback = _create_ollama_llm(None, temperature, max_tokens)
+            llm_with_fallback = llm.with_fallbacks(
+                [openai_fallback, ollama_fallback],
+                exceptions_to_handle=(Exception,)
+            )
+            logger.info("🛡️ Added OpenAI and Ollama as automatic fallbacks for Gemini")
+            return llm_with_fallback
+        except Exception as fallback_error:
+            logger.warning(f"⚠️ Could not setup fallbacks: {str(fallback_error)}")
+            return llm
     except Exception as e:
         logger.error(f"❌ Failed to initialize Gemini LLM: {str(e)}")
         raise

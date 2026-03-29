@@ -6,6 +6,7 @@ import json
 import os
 from pathlib import Path
 from typing import Dict, List, Union
+import concurrent.futures
 from utils.llm_factory import create_llm
 from utils.llm_parser import safe_parse_json
 from langchain_core.messages import SystemMessage, HumanMessage
@@ -101,17 +102,27 @@ class StyleAgent:
             logger.info(f"📉 Limiting analysis to {max_files} files")
             files_to_analyze = files_to_analyze[:max_files]
         
-        # Analyze each file
-        for idx, file_info in enumerate(files_to_analyze, 1):
-            file_path = file_info['path']
-            logger.info(f"✨ Analyzing ({idx}/{len(files_to_analyze)}): {Path(file_path).name}")
+        # Analyze each file concurrently
+        total_files = len(files_to_analyze)
+        logger.info(f"🔄 Processing {total_files} files concurrently with 3 workers")
+        with concurrent.futures.ThreadPoolExecutor(max_workers=3) as executor:
+            future_to_file = {
+                executor.submit(self._analyze_file, file_info['path']): file_info
+                for file_info in files_to_analyze
+            }
             
-            try:
-                file_findings = self._analyze_file(file_path)
-                findings.extend(file_findings)
-            except Exception as e:
-                logger.error(f"❌ Failed to analyze {file_path}: {str(e)}")
-                continue
+            completed = 0
+            for future in concurrent.futures.as_completed(future_to_file):
+                file_info = future_to_file[future]
+                file_path = file_info['path']
+                completed += 1
+                logger.info(f"✨ Completed analysis ({completed}/{total_files}): {Path(file_path).name}")
+                
+                try:
+                    file_findings = future.result()
+                    findings.extend(file_findings)
+                except Exception as e:
+                    logger.error(f"❌ Failed to analyze {file_path}: {str(e)}")
         
         logger.info(f"✅ Style analysis complete: {len(findings)} findings")
         return findings
@@ -222,14 +233,28 @@ Be constructive and educational in your recommendations.
             return []
 
     @retry(
-        stop=stop_after_attempt(3),
-        wait=wait_exponential(multiplier=1, min=2, max=10),
+        stop=stop_after_attempt(5),
+        wait=wait_exponential(multiplier=2, min=4, max=60),
         reraise=True
     )
     def _get_llm_response(self, messages: List) -> str:
-        """Get response from LLM with retries."""
-        response = self.llm.invoke(messages)
-        return response.content
+        """Get response from LLM with robust retries for rate limits."""
+        try:
+            response = self.llm.invoke(messages)
+            return response.content
+        except Exception as e:
+            error_msg = str(e)
+            if "RESOURCE_EXHAUSTED" in error_msg or "429" in error_msg:
+                short_msg = error_msg.split('\n')[0][:200]
+                logger.warning(f"⏳ Rate limit/Quota hit. Retrying... ({short_msg})")
+                raise
+            
+            short_msg = error_msg.split('\n')[0][:200]
+            logger.warning(f"⚠️ Primary LLM failed in Style Agent, falling back to Ollama: {short_msg}")
+            from utils.llm_factory import _create_ollama_llm
+            fallback_llm = _create_ollama_llm(None, self.temperature, self.max_tokens)
+            response = fallback_llm.invoke(messages)
+            return response.content
     
     def _parse_llm_response(self, response: Union[str, list], file_path: str) -> List[Dict]:
         """Parse LLM JSON response into structured findings."""

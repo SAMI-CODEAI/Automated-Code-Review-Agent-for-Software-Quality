@@ -97,9 +97,9 @@ def create_review_graph() -> StateGraph:
         }
     )
     
-    # All three agents converge to aggregator (sequential chain)
-    workflow.add_edge("security", "performance")
-    workflow.add_edge("performance", "style")
+    # All three agents run in parallel from ingestor
+    workflow.add_edge("security", "aggregator")
+    workflow.add_edge("performance", "aggregator")
     workflow.add_edge("style", "aggregator")
     
     # End after aggregator

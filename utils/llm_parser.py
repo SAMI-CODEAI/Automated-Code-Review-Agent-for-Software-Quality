@@ -85,9 +85,13 @@ def safe_parse_json(text: str, expected_type: Type = list) -> Any:
         return expected_type()
 
     # 2. Basic cleanup for common issues
-    # Remove common conversational prefixes if they slipped in
-    # (e.g. "Here is the JSON: [ ... ]")
-    
+    # Handle Windows paths which often contain unescaped backslashes causing \U \t errors
+    json_str = re.sub(
+        r'([a-zA-Z]:\\[^"\n\r]*)', 
+        lambda m: m.group(1).replace('\\', '/'), 
+        json_str
+    )
+
     # 3. Attempt parsing
     try:
         return json.loads(json_str)
