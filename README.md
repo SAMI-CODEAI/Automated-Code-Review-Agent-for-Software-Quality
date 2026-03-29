@@ -204,11 +204,11 @@ flowchart TD
     
     D & F --> G[scan_local_directory\nwith pathspec .gitignore support]
     G --> H[Filter by extension\nand file size ≤ 5MB]
-    H --> I[Build file_tree dict\n{files, total_files, extensions}]
-    I --> J[Write file_tree, working_dir,\nsource_type to ReviewState]
+    H --> I["Build file_tree dict\nfiles, total_files, extensions"]
+    I --> J["Write file_tree, working_dir,\nsource_type to ReviewState"]
     J --> K{total_files > 0?}
     K -- No --> L[Return END edge]
-    K -- Yes --> M[Return 'continue' edge\nto parallel agents]
+    K -- Yes --> M["Return continue edge\nto parallel agents"]
 ```
 
 **Key Implementation Details:**
